@@ -95,7 +95,9 @@ public final class ArgumentGroupImpl implements ArgumentGroup,
         }
         for (ArgumentImpl arg : args_) {
             arg.printHelp(writer, argumentParser_.isDefaultHelp(),
-                    argumentParser_.getTextWidthCounter(), format_width);
+            		argumentParser_.isDeprecatedHelp(),
+            		argumentParser_.getTextWidthCounter(), format_width,
+            		argumentParser_.getResourceBundle());
         }
     }
 

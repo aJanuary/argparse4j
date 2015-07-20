@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
+import java.util.ResourceBundle;
 
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.helper.PrefixPattern;
@@ -51,7 +52,7 @@ import net.sourceforge.argparse4j.inf.FeatureControl;
 public final class ArgumentImpl implements Argument {
 
     private String name_;
-    private String flags_[];
+    private Flag flags_[];
     private String dest_;
     private ArgumentType<?> type_ = new StringArgumentType();
     private ArgumentAction action_ = Arguments.store();
@@ -64,19 +65,39 @@ public final class ArgumentImpl implements Argument {
     private String metavar_[];
     private int minNumArg_ = -1;
     private int maxNumArg_ = -1;
+    private boolean deprecated_;
     private String help_ = "";
+    private PrefixPattern prefixPattern_;
+    private ArgumentStore argumentStore_;
     private ArgumentGroupImpl argumentGroup_;
+    
+    public static final class Flag {
+    	public Flag(String name, boolean isDeprecated) {
+    		this.name = name;
+    		this.isDeprecated = isDeprecated;
+		}
+    	
+		public String name;
+    	public boolean isDeprecated;
+    }
 
     public ArgumentImpl(PrefixPattern prefixPattern, String... nameOrFlags) {
-        this(prefixPattern, null, nameOrFlags);
+        this(prefixPattern, null, null, nameOrFlags);
+    }
+    
+    public ArgumentImpl(PrefixPattern prefixPattern,
+            ArgumentGroupImpl argumentGroup, String... nameOrFlags) {
+    	this(prefixPattern, argumentGroup, null, nameOrFlags);
     }
 
     public ArgumentImpl(PrefixPattern prefixPattern,
-            ArgumentGroupImpl argumentGroup, String... nameOrFlags) {
+            ArgumentGroupImpl argumentGroup, ArgumentStore argumentStore, String... nameOrFlags) {
         if (nameOrFlags.length == 0) {
             throw new IllegalArgumentException("no nameOrFlags was specified");
         }
         argumentGroup_ = argumentGroup;
+        prefixPattern_ = prefixPattern;
+        argumentStore_ = argumentStore;
         if (nameOrFlags.length == 1 && !prefixPattern.match(nameOrFlags[0])) {
             if (argumentGroup_ != null && argumentGroup_.isMutex()) {
                 throw new IllegalArgumentException(
@@ -86,9 +107,15 @@ public final class ArgumentImpl implements Argument {
             if (ArgumentParsers.getNoDestConversionForPositionalArgs() == false) {
                 dest_ = name_.replace('-', '_');
             }
+            if (argumentStore_ != null) {
+            	argumentStore_.addArgument(this);
+            }
         } else {
-            flags_ = nameOrFlags;
-            for (String flag : flags_) {
+            flags_ = new Flag[nameOrFlags.length];
+            for (int i = 0; i < nameOrFlags.length; i++) {
+            	String flag = nameOrFlags[i];
+            	flags_[i] = new Flag(flag, false);
+            	
                 if (!prefixPattern.match(flag)) {
                     throw new IllegalArgumentException(
                             String.format(
@@ -97,26 +124,35 @@ public final class ArgumentImpl implements Argument {
                                     flag, prefixPattern.getPrefixChars()));
                 }
             }
-            for (String flag : flags_) {
-                boolean longflag = prefixPattern.matchLongFlag(flag);
+            for (Flag flag : flags_) {
+                boolean longflag = prefixPattern.matchLongFlag(flag.name);
                 if (dest_ == null) {
-                    dest_ = flag;
+                    dest_ = flag.name;
                     if (longflag) {
                         break;
                     }
                 } else if (longflag) {
-                    dest_ = flag;
+                    dest_ = flag.name;
                     break;
                 }
             }
             dest_ = prefixPattern.removePrefix(dest_).replace('-', '_');
+            
+            if (argumentStore_ != null) {
+            	argumentStore_.addArgument(this);
+            	argumentStore_.addFlags(this, nameOrFlags);
+            }
         }
     }
 
     @Override
     public String textualName() {
         if (name_ == null) {
-            return TextHelper.concat(flags_, 0, "/");
+        	String[] names = new String[flags_.length];
+        	for (int i = 0; i < flags_.length; i++) {
+        		names[i] = flags_[i].name;
+        	}
+            return TextHelper.concat(names, 0, "/");
         } else {
             return name_;
         }
@@ -133,7 +169,7 @@ public final class ArgumentImpl implements Argument {
             if (!required_) {
                 sb.append("[");
             }
-            sb.append(flags_[0]);
+            sb.append(flags_[0].name);
             String mv = formatMetavar();
             if (!mv.isEmpty()) {
                 sb.append(" ").append(mv);
@@ -156,7 +192,7 @@ public final class ArgumentImpl implements Argument {
     public String formatShortSyntaxNoBracket() {
         if (name_ == null) {
             StringBuilder sb = new StringBuilder();
-            sb.append(flags_[0]);
+            sb.append(flags_[0].name);
             String mv = formatMetavar();
             if (!mv.isEmpty()) {
                 sb.append(" ").append(mv);
@@ -212,25 +248,41 @@ public final class ArgumentImpl implements Argument {
     }
 
     private String formatHelpTitle() {
+    	// Can pass null as the resourceBundle because it's only used when deprecatedHelp is true
+    	return formatHelpTitle(false, null);
+    }
+
+    private String formatHelpTitle(boolean deprecatedHelp, ResourceBundle resourceBundle) {
         if (isOptionalArgument()) {
             String mv = formatMetavar();
             StringBuilder sb = new StringBuilder();
 
             if(ArgumentParsers.isSingleMetavar()) {
-                for (String flag : flags_) {
+                for (Flag flag : flags_) {
+                	if (!deprecatedHelp && (isDeprecated() || flag.isDeprecated)) {
+                		continue;
+                	}
+                	
                     if(sb.length() > 0) {
                         sb.append(", ");
                     }
-                    sb.append(flag);
+                    sb.append(flag.name);
                 }
                 if (!mv.isEmpty()) {
                     sb.append(" ").append(mv);
                 }
             } else {
-                for (String flag : flags_) {
-                    sb.append(flag);
+                for (Flag flag : flags_) {
+                	if (!deprecatedHelp && (isDeprecated() || flag.isDeprecated)) {
+                		continue;
+                	}
+                	
+                    sb.append(flag.name);
                     if (!mv.isEmpty()) {
                         sb.append(" ").append(mv);
+                    }
+                    if (isDeprecated() || flag.isDeprecated) {
+                    	sb.append(" (").append(resourceBundle.getString("deprecated")).append(")");
                     }
                     sb.append(", ");
                 }
@@ -245,22 +297,33 @@ public final class ArgumentImpl implements Argument {
     }
 
     public void printHelp(PrintWriter writer, boolean defaultHelp,
-            TextWidthCounter textWidthCounter, int width) {
-        if (helpControl_ == Arguments.SUPPRESS) {
+    		TextWidthCounter textWidthCounter,
+    		int width, ResourceBundle resourceBundle) {
+    	printHelp(writer, defaultHelp, textWidthCounter, width, resourceBundle);
+    }
+
+    public void printHelp(PrintWriter writer, boolean defaultHelp,
+    		boolean deprecatedHelp, TextWidthCounter textWidthCounter,
+    		int width, ResourceBundle resourceBundle) {
+
+        if (helpControl_ == Arguments.SUPPRESS || (deprecated_ && !deprecatedHelp)) {
             return;
         }
+
         String help;
         if (defaultHelp && default_ != null) {
             StringBuilder sb = new StringBuilder(help_);
             if (!help_.isEmpty()) {
                 sb.append(" ");
             }
-            sb.append("(default: ").append(default_.toString()).append(")");
+        	sb.append("(")
+        		.append(resourceBundle.getString("default"))
+        		.append(" ").append(default_.toString()).append(")");
             help = sb.toString();
         } else {
-            help = help_;
+        	help = help_;
         }
-        TextHelper.printHelp(writer, formatHelpTitle(), help, textWidthCounter,
+        TextHelper.printHelp(writer, formatHelpTitle(deprecatedHelp, resourceBundle), help, textWidthCounter,
                 width);
     }
 
@@ -384,6 +447,9 @@ public final class ArgumentImpl implements Argument {
 
     @Override
     public ArgumentImpl required(boolean required) {
+    	if (isDeprecated()) {
+    		throw new IllegalArgumentException("deprecated arguments cannot be required");
+    	}
         required_ = required;
         return this;
     }
@@ -449,6 +515,54 @@ public final class ArgumentImpl implements Argument {
     }
 
     @Override
+    public ArgumentImpl deprecated(boolean deprecated) {
+    	checkDeprecationRequirements();
+    	deprecated_ = deprecated;
+    	return this;
+    }
+
+    @Override
+    public ArgumentImpl deprecatedAliases(String... flagAliases) {
+    	checkDeprecationRequirements();
+
+    	if (flagAliases.length == 0) {
+    		throw new IllegalArgumentException("no flags were specified");
+    	}
+
+    	for (String alias : flagAliases) {
+    		if (!prefixPattern_.match(alias)) {
+    			throw new IllegalArgumentException(
+    					String.format(
+    							TextHelper.LOCALE_ROOT,
+    							"invalid option string '%s': must starti wht a character '%s'",
+    							alias, prefixPattern_.getPrefixChars()));
+    		}
+    	}
+    	
+		if (argumentStore_ != null) {
+			argumentStore_.addFlags(this, flagAliases);
+		}
+
+    	Flag newFlags[] = new Flag[flags_.length + flagAliases.length];
+    	System.arraycopy(flags_, 0, newFlags, 0, flags_.length);
+    	for (int i = 0; i < flagAliases.length; i++) {
+    		newFlags[i + flags_.length] = new Flag(flagAliases[i], true);
+    	}
+    	flags_ = newFlags;
+
+    	return this;
+    }
+
+	private void checkDeprecationRequirements() {
+		if (!isOptionalArgument()) {
+    		throw new IllegalArgumentException("only optional arguments can have alises");
+    	}
+    	if (isRequired()) {
+    		throw new IllegalArgumentException("deprecated arguments cannot be required");
+    	}
+	}
+
+    @Override
     public ArgumentImpl help(String help) {
         help_ = TextHelper.nonNull(help);
         return this;
@@ -510,6 +624,10 @@ public final class ArgumentImpl implements Argument {
     public boolean isRequired() {
         return required_;
     }
+    
+    public boolean isDeprecated() {
+    	return deprecated_;
+    }
 
     public int getMinNumArg() {
         return minNumArg_;
@@ -535,7 +653,11 @@ public final class ArgumentImpl implements Argument {
         return help_;
     }
 
-    public String[] getFlags() {
+    public Flag[] getFlags() {
         return flags_;
     }
+
+	public boolean isHelpSuppressed() {
+		return getHelpControl() == Arguments.SUPPRESS || isDeprecated();
+	}
 }

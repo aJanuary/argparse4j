@@ -155,6 +155,16 @@ public class ArgumentParserImplTest {
         } catch (IllegalArgumentException e) {
         }
     }
+    
+    @Test(expected=IllegalArgumentException.class)
+    public void testDeprecatedRequiredParameter() throws ArgumentParserException {
+    	ap.addArgument("--foo").required(true).deprecated(true);
+    }
+    
+    @Test(expected=IllegalArgumentException.class)
+    public void testRequireDeprecatedParameter() throws ArgumentParserException {
+    	ap.addArgument("--foo").deprecated(true).required(true);
+    }
 
     @Test
     public void testParseArgsWithPosargOutOfIndex()
@@ -1294,6 +1304,142 @@ public class ArgumentParserImplTest {
                    + "  -h, --help             show this help message and exit%n"
                    + "  -j J%n"),
                 sap.formatHelp());
+    }
+
+
+    @Test
+    public void testFormatHelpWithHiddenDeprecatedFlags()
+    		throws ArgumentParserException {
+        ArgumentGroup group = ap.addArgumentGroup("group");
+        group.addArgument("--foo");
+        group.addArgument("--bar").deprecated(true);
+        group.addArgument("--baz").deprecatedAliases("--biz", "--bop");
+        ap.addArgument("-a").deprecated(true);
+        ap.addArgument("-b");
+        ap.addArgument("-c").deprecatedAliases("-e");
+        MutuallyExclusiveGroup mutex1 = ap.addMutuallyExclusiveGroup("mutex1");
+        mutex1.addArgument("-f").deprecated(true);
+        mutex1.addArgument("-g");
+        MutuallyExclusiveGroup mutex2 = ap.addMutuallyExclusiveGroup("mutex2")
+                .required(true);
+        mutex2.addArgument("-i").deprecated(true);
+        mutex2.addArgument("-j");
+        mutex2.addArgument("-k");
+        ap.addArgument("s");
+        ap.addArgument("t");
+        Subparsers subparsers = ap.addSubparsers();
+        Subparser sap = subparsers.addParser("add");
+        sap.addArgument("-l").deprecated(true);
+        sap.addArgument("-m");
+
+        assertEquals(String.format(
+                     TextHelper.LOCALE_ROOT,
+                     "usage: argparse4j [-h] [--foo FOO] [--baz BAZ] [-b B] [-c C] [-g G] (-j J |%n"
+                   + "                  -k K) s t {add} ...%n"
+                   + "%n"
+                   + "positional arguments:%n"
+                   + "  s%n"
+                   + "  t%n"
+                   + "  {add}%n"
+                   + "%n"
+                   + "optional arguments:%n"
+                   + "  -h, --help             show this help message and exit%n"
+                   + "  -b B%n"
+                   + "  -c C%n"
+                   + "%n"
+                   + "group:%n"
+                   + "  --foo FOO%n"
+                   + "  --baz BAZ%n"
+                   + "%n"
+                   + "mutex1:%n"
+                   + "  -g G%n"
+                   + "%n"
+                   + "mutex2:%n"
+                   + "  -j J%n"
+                   + "  -k K%n"),
+                   ap.formatHelp());
+        // Check upper parsers's suppressed required arguments are not shown. 
+        assertEquals(String.format(
+                     TextHelper.LOCALE_ROOT,
+                     "usage: argparse4j (-j J | -k K) s t add [-h] [-m M]%n"
+                   + "%n"
+                   + "optional arguments:%n"
+                   + "  -h, --help             show this help message and exit%n"
+                   + "  -m M%n"),
+                sap.formatHelp());
+    }
+
+
+    @Test
+    public void testFormatHelpWithHiddenVisibleFlags()
+    		throws ArgumentParserException {
+    	try {
+	    	ap.deprecatedHelp(true);
+	    	
+	        ArgumentGroup group = ap.addArgumentGroup("group");
+	        group.addArgument("--foo");
+	        group.addArgument("--bar").deprecated(true);
+	        group.addArgument("--baz").deprecatedAliases("--biz", "--bop");
+	        ap.addArgument("-a").deprecated(true);
+	        ap.addArgument("-b");
+	        ap.addArgument("-c").deprecatedAliases("-e");
+	        MutuallyExclusiveGroup mutex1 = ap.addMutuallyExclusiveGroup("mutex1");
+	        mutex1.addArgument("-f").deprecated(true);
+	        mutex1.addArgument("-g");
+	        MutuallyExclusiveGroup mutex2 = ap.addMutuallyExclusiveGroup("mutex2")
+	                .required(true);
+	        mutex2.addArgument("-i").deprecated(true);
+	        mutex2.addArgument("-j");
+	        mutex2.addArgument("-k");
+	        ap.addArgument("s");
+	        ap.addArgument("t");
+	        Subparsers subparsers = ap.addSubparsers();
+	        Subparser sap = subparsers.addParser("add");
+	        sap.addArgument("-l").deprecated(true);
+	        sap.addArgument("-m");
+	
+	        assertEquals(String.format(
+	                     TextHelper.LOCALE_ROOT,
+	                     "usage: argparse4j [-h] [--foo FOO] [--baz BAZ] [-b B] [-c C] [-g G] (-j J |%n"
+	                   + "                  -k K) s t {add} ...%n"
+	                   + "%n"
+	                   + "positional arguments:%n"
+	                   + "  s%n"
+	                   + "  t%n"
+	                   + "  {add}%n"
+	                   + "%n"
+	                   + "optional arguments:%n"
+	                   + "  -h, --help             show this help message and exit%n"
+	                   + "  -a A (deprecated)%n"
+	                   + "  -b B%n"
+	                   + "  -c C, -e C (deprecated)%n"
+	                   + "%n"
+	                   + "group:%n"
+	                   + "  --foo FOO%n"
+	                   + "  --bar BAR (deprecated)%n"
+	                   + "  --baz BAZ, --biz BAZ (deprecated), --bop BAZ (deprecated)%n"
+	                   + "%n"
+	                   + "mutex1:%n"
+	                   + "  -f F (deprecated)%n"
+	                   + "  -g G%n"
+	                   + "%n"
+	                   + "mutex2:%n"
+	                   + "  -i I (deprecated)%n"
+	                   + "  -j J%n"
+	                   + "  -k K%n"),
+	                   ap.formatHelp());
+	        // Check upper parsers's suppressed required arguments are not shown. 
+	        assertEquals(String.format(
+	                     TextHelper.LOCALE_ROOT,
+	                     "usage: argparse4j (-j J | -k K) s t add [-h] [-m M]%n"
+	                   + "%n"
+	                   + "optional arguments:%n"
+	                   + "  -h, --help             show this help message and exit%n"
+	                   + "  -m M%n"),
+	                sap.formatHelp());
+    	} finally {
+    		ap.deprecatedHelp(false);
+    	}
     }
 
 

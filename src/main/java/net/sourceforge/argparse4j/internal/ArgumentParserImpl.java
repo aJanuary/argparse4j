@@ -58,11 +58,12 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.MutuallyExclusiveGroup;
 import net.sourceforge.argparse4j.inf.Namespace;
+import net.sourceforge.argparse4j.internal.ArgumentImpl.Flag;
 
 /**
  * <strong>The application code must not use this class directly.</strong>
  */
-public final class ArgumentParserImpl implements ArgumentParser {
+public final class ArgumentParserImpl implements ArgumentParser, ArgumentStore {
 
     private Map<String, ArgumentImpl> optargIndex_ = new HashMap<String, ArgumentImpl>();
     private List<ArgumentImpl> optargs_ = new ArrayList<ArgumentImpl>();
@@ -80,6 +81,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
     private PrefixPattern prefixPattern_;
     private PrefixPattern fromFilePrefixPattern_;
     private boolean defaultHelp_ = false;
+    private boolean deprecatedHelp_ = false;
     private boolean negNumFlag_ = false;
     private TextWidthCounter textWidthCounter_;
     private ResourceBundle resourceBundle = ResourceBundle.getBundle(this
@@ -88,7 +90,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
     private static final Pattern NEG_NUM_PATTERN = Pattern.compile("-\\d+");
     private static final Pattern SHORT_OPTS_PATTERN = Pattern
             .compile("-[^-].*");
-
+    
     public ArgumentParserImpl(String prog) {
         this(prog, true, ArgumentParsers.DEFAULT_PREFIX_CHARS, null,
                 new ASCIITextWidthCounter(), null, null);
@@ -147,24 +149,13 @@ public final class ArgumentParserImpl implements ArgumentParser {
 
     public ArgumentImpl addArgument(ArgumentGroupImpl group,
             String... nameOrFlags) {
-        ArgumentImpl arg = new ArgumentImpl(prefixPattern_, group, nameOrFlags);
+        ArgumentImpl arg = new ArgumentImpl(prefixPattern_, group, this, nameOrFlags);
+        return arg;
+    }
+
+    @Override
+    public void addArgument(ArgumentImpl arg) {
         if (arg.isOptionalArgument()) {
-            for (String flag : arg.getFlags()) {
-                ArgumentImpl another = optargIndex_.get(flag);
-                if (another != null) {
-                    // TODO No conflict handler ATM
-                    throw new IllegalArgumentException(String.format(
-                            TextHelper.LOCALE_ROOT,
-                            "argument %s: conflicting option string(s): %s",
-                            flag, another.textualName()));
-                }
-            }
-            for (String flag : arg.getFlags()) {
-                if (NEG_NUM_PATTERN.matcher(flag).matches()) {
-                    negNumFlag_ = true;
-                }
-                optargIndex_.put(flag, arg);
-            }
             optargs_.add(arg);
         } else {
             for (ArgumentImpl another : posargs_) {
@@ -178,8 +169,27 @@ public final class ArgumentParserImpl implements ArgumentParser {
             }
             posargs_.add(arg);
         }
-        return arg;
     }
+
+    @Override
+	public void addFlags(ArgumentImpl arg, String... flags) {
+        for (String flag : flags) {
+            ArgumentImpl another = optargIndex_.get(flag);
+            if (another != null) {
+                // TODO No conflict handler ATM
+                throw new IllegalArgumentException(String.format(
+                        TextHelper.LOCALE_ROOT,
+                        "argument %s: conflicting option string(s): %s",
+                        flag, another.textualName()));
+            }
+        }
+        for (String flag : flags) {
+            if (NEG_NUM_PATTERN.matcher(flag).matches()) {
+                negNumFlag_ = true;
+            }
+            optargIndex_.put(flag, arg);
+        }
+	}
 
     @Override
     public SubparsersImpl addSubparsers() {
@@ -248,14 +258,24 @@ public final class ArgumentParserImpl implements ArgumentParser {
     public boolean isDefaultHelp() {
         return defaultHelp_;
     }
+    
+    @Override
+    public ArgumentParserImpl deprecatedHelp(boolean deprecatedHelp) {
+    	deprecatedHelp_ = deprecatedHelp;
+    	return this;
+    }
+    
+    public boolean isDeprecatedHelp() {
+    	return deprecatedHelp_;
+    }
 
     private void printArgumentHelp(PrintWriter writer, List<ArgumentImpl> args,
             int format_width) {
         for (ArgumentImpl arg : args) {
             if (arg.getArgumentGroup() == null
                     || !arg.getArgumentGroup().isSeparateHelp()) {
-                arg.printHelp(writer, defaultHelp_, textWidthCounter_,
-                        format_width);
+                arg.printHelp(writer, defaultHelp_, deprecatedHelp_,
+                		textWidthCounter_, format_width, resourceBundle);
             }
         }
     }
@@ -401,7 +421,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             opts.add(command_);
         }
         for (ArgumentImpl arg : optargs_) {
-            if (arg.getHelpControl() != Arguments.SUPPRESS
+            if (!arg.isHelpSuppressed()
                     && (arg.getArgumentGroup() == null || !arg
                             .getArgumentGroup().isMutex())) {
                 opts.add(arg.formatShortSyntax());
@@ -432,7 +452,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             }
         }
         for (ArgumentImpl arg : posargs_) {
-            if (arg.getHelpControl() != Arguments.SUPPRESS) {
+            if (!arg.isHelpSuppressed()) {
                 opts.add(arg.formatShortSyntax());
             }
         }
@@ -455,7 +475,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             Collection<ArgumentImpl> args) {
         ArrayList<ArgumentImpl> res = new ArrayList<ArgumentImpl>();
         for (ArgumentImpl arg : args) {
-            if (arg.getHelpControl() != Arguments.SUPPRESS) {
+            if (!arg.isHelpSuppressed()) {
                 res.add(arg);
             }
         }
@@ -482,7 +502,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             opts.add(parser.command_);
         }
         for (ArgumentImpl arg : parser.optargs_) {
-            if (arg.getHelpControl() != Arguments.SUPPRESS
+            if (!arg.isHelpSuppressed()
                     && arg.isRequired()
                     && (arg.getArgumentGroup() == null || !arg
                             .getArgumentGroup().isMutex())) {
@@ -517,7 +537,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
         }
 
         for (ArgumentImpl arg : parser.posargs_) {
-            if (arg.getHelpControl() != Arguments.SUPPRESS) {
+            if (!arg.isHelpSuppressed()) {
                 opts.add(arg.formatShortSyntax());
             }
         }
@@ -1273,7 +1293,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             if (group.isMutex() && group.isRequired() && used[i] == null) {
                 StringBuilder sb = new StringBuilder();
                 for (ArgumentImpl arg : group.getArgs()) {
-                    if (arg.getHelpControl() != Arguments.SUPPRESS) {
+                    if (!arg.isHelpSuppressed()) {
                         sb.append(arg.textualName()).append(" ");
                     }
                 }
@@ -1473,13 +1493,13 @@ public final class ArgumentParserImpl implements ArgumentParser {
     private void printFlagCandidates(String flagBody, PrintWriter writer) {
         List<SubjectBody> subjects = new ArrayList<SubjectBody>();
         for (ArgumentImpl arg : optargs_) {
-            String[] flags = arg.getFlags();
+            Flag[] flags = arg.getFlags();
             for (int i = 0, len = flags.length; i < len; ++i) {
-                String body = prefixPattern_.removePrefix(flags[i]);
+                String body = prefixPattern_.removePrefix(flags[i].name);
                 if (body.length() <= 1) {
                     continue;
                 }
-                subjects.add(new SubjectBody(flags[i], body));
+                subjects.add(new SubjectBody(flags[i].name, body));
             }
         }
         printCandidates(flagBody, subjects, writer);
@@ -1565,6 +1585,10 @@ public final class ArgumentParserImpl implements ArgumentParser {
         return fromFilePrefixPattern_ == null ? null : fromFilePrefixPattern_
                 .getPrefixChars();
     }
+    
+	public ResourceBundle getResourceBundle() {
+		return resourceBundle;
+	}
 
     /**
      * Returns main (parent) parser.

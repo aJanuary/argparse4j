@@ -193,6 +193,23 @@ public interface ArgumentParser {
      * @return this
      */
     ArgumentParser defaultHelp(boolean defaultHelp);
+    
+    /**
+     * <p>
+     * If deprecatedHelp is {@code true}, deprecated arguments are
+     * printed in the help message.
+     * <p>
+     * <p>
+     * By default, the deprecated arguments are not printed in help
+     * message.
+     * </p>
+     * 
+     * @param deprecatedHelp
+     *            Switch to display the deprecated arguments in help
+     *            message.
+     * @return this
+     */
+    ArgumentParser deprecatedHelp(boolean deprecatedHelp);
 
     /**
      * Prints help message in stdout.

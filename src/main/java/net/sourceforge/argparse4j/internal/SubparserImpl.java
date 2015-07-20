@@ -111,6 +111,12 @@ public final class SubparserImpl implements Subparser {
         parser_.defaultHelp(defaultHelp);
         return this;
     }
+    
+    @Override
+    public SubparserImpl deprecatedHelp(boolean deprecatedHelp) {
+    	parser_.deprecatedHelp(deprecatedHelp);
+    	return this;
+    }
 
     @Override
     public void printHelp() {
