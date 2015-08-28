@@ -166,6 +166,40 @@ public final class ArgumentImpl implements Argument {
             return formatMetavar();
         }
     }
+    
+    public String formatShortManSyntax() {
+        if (name_ == null) {
+            StringBuilder sb = new StringBuilder();
+            if (!required_) {
+                sb.append("[");
+            }
+            sb.append("\\fB").append(flags_[0]).append("\\fR");
+            String mv = formatMetavar();
+            if (!mv.isEmpty()) {
+                sb.append(" \\fI").append(mv).append("\\fR");
+            }
+            if (!required_) {
+                sb.append("]");
+            }
+            return sb.toString();
+        } else {
+            return formatMetavar();
+        }
+    }
+    
+    public String formatShortManSyntaxNoBracket() {
+        if (name_ == null) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("\\fB").append(flags_[0]).append("\\fR");
+            String mv = formatMetavar();
+            if (!mv.isEmpty()) {
+                sb.append(" \\fI").append(mv).append("\\fR");
+            }
+            return sb.toString();
+        } else {
+            return formatMetavar();
+        }
+    }
 
     public String[] resolveMetavar() {
         if (metavar_ == null) {
@@ -263,6 +297,31 @@ public final class ArgumentImpl implements Argument {
         TextHelper.printHelp(writer, formatHelpTitle(), help, textWidthCounter,
                 width);
     }
+    
+	public void printMan(PrintWriter writer) {
+        if (helpControl_ == Arguments.SUPPRESS) {
+            return;
+        }
+        
+        String mv = formatMetavar();
+        
+        writer.write(".TP\n");
+        writer.write(".BR ");
+        for (int i = 0; i < flags_.length; i++) {
+        	if (i > 0) {
+        		writer.write(" \", \" ");
+        	}
+        	writer.write(flags_[i].replace("\\", "\\\\").replace("-", "\\-"));
+            if (!mv.isEmpty()) {
+                writer.write(" \" \" \\fI" + mv + "\\fR");
+            }
+        }
+        writer.write("\n");
+        if (help_ != null && !help_.isEmpty()) {
+        	// TODO: Escape
+        	writer.write(help_ + "\n");
+        }
+	}
 
     public Object convert(ArgumentParserImpl parser, String value)
             throws ArgumentParserException {
@@ -538,4 +597,5 @@ public final class ArgumentImpl implements Argument {
     public String[] getFlags() {
         return flags_;
     }
+
 }

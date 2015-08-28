@@ -29,6 +29,8 @@ import java.util.Map;
 
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.annotation.Arg;
+import net.sourceforge.argparse4j.helper.TextHelper;
+import net.sourceforge.argparse4j.internal.ArgumentParserImpl;
 
 /**
  * <p>
@@ -152,6 +154,15 @@ public interface ArgumentParser {
      * @return this
      */
     ArgumentParser description(String description);
+    
+    /**
+     * Set text to display in the description section of the man page.
+     * 
+     * @param longDescription
+     *            text to display in the description section of the man page
+     * @return this
+     */
+    ArgumentParser longDescription(String longDescription);
 
     /**
      * Sets the text to display after the argument help.
@@ -256,6 +267,14 @@ public interface ArgumentParser {
      * @return The version string.
      */
     String formatVersion();
+    
+    /**
+     * Prints man page source in writer.
+     * 
+     * @param writer
+     *           Writer to print man page source.
+     */
+    void printMan(PrintWriter writer);
 
     /**
      * <p>

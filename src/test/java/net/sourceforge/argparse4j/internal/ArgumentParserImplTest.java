@@ -1,7 +1,24 @@
 package net.sourceforge.argparse4j.internal;
 
+import static net.sourceforge.argparse4j.impl.Arguments.SUPPRESS;
+import static net.sourceforge.argparse4j.impl.Arguments.append;
+import static net.sourceforge.argparse4j.impl.Arguments.appendConst;
+import static net.sourceforge.argparse4j.impl.Arguments.count;
+import static net.sourceforge.argparse4j.impl.Arguments.range;
+import static net.sourceforge.argparse4j.impl.Arguments.storeConst;
+import static net.sourceforge.argparse4j.impl.Arguments.storeFalse;
+import static net.sourceforge.argparse4j.impl.Arguments.storeTrue;
+import static net.sourceforge.argparse4j.test.TestHelper.list;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,21 +43,6 @@ import net.sourceforge.argparse4j.internal.ArgumentParserImpl.Candidate;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import static net.sourceforge.argparse4j.impl.Arguments.SUPPRESS;
-import static net.sourceforge.argparse4j.impl.Arguments.append;
-import static net.sourceforge.argparse4j.impl.Arguments.appendConst;
-import static net.sourceforge.argparse4j.impl.Arguments.count;
-import static net.sourceforge.argparse4j.impl.Arguments.range;
-import static net.sourceforge.argparse4j.impl.Arguments.storeConst;
-import static net.sourceforge.argparse4j.impl.Arguments.storeFalse;
-import static net.sourceforge.argparse4j.impl.Arguments.storeTrue;
-import static net.sourceforge.argparse4j.test.TestHelper.list;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class ArgumentParserImplTest {
 
@@ -1406,6 +1408,52 @@ public class ArgumentParserImplTest {
     public void testFormatVersion() throws ArgumentParserException {
         ap.version("${prog} version 7.8.7 (Dreamliner)");
         assertEquals("argparse4j version 7.8.7 (Dreamliner)", ap.formatVersion());
+    }
+    
+    @Test
+    public void testPrintMan() throws UnsupportedEncodingException {
+    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    	PrintWriter pw = new PrintWriter(baos);
+    	
+    	ap.description("This is argparser4j.");
+    	ap.longDescription("argparse4j is a library for parsing arguments.");
+    	ap.addArgument("-f", "--foo").help("switches on foo");
+    	ap.printMan(pw);
+    	pw.flush();
+    	
+    	assertEquals(".TH argparse4j 1\n"
+    			   + ".SH NAME\n"
+    			   + "argparse4j \\- This is argparser4j.\n"
+    			   + ".SH SYNOPSIS\n"
+    			   + ".B argparse4j\n"
+    			   + "[\\fB-h\\fR]\n"
+    			   + "[\\fB-f\\fR \\fIFOO\\fR]\n"
+    			   + ".SH DESCRIPTION\n"
+    			   + ".B argparse4j\n"
+    			   + "is a library for parsing arguments.\n"
+    			   + ".SH OPTIONS\n"
+    			   + ".TP\n"
+    			   + ".BR \\-h \", \" \\-\\-help\n"
+    			   + "show this help message and exit\n"
+    			   + ".TP\n"
+    			   + ".BR \\-f \" \" \\fIFOO\\fR \", \" \\-\\-foo \" \" \\fIFOO\\fR\n"
+    			   + "switches on foo\n"
+    			   , baos.toString("UTF-8"));
+    }
+    
+    @Test
+    public void testPrintManWithNoDescription() throws UnsupportedEncodingException {
+    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    	PrintWriter pw = new PrintWriter(baos);
+    	
+    	ap.printMan(pw);
+    	pw.flush();
+    	
+    	assertEquals(".TH argparse4j 1\n"
+    			   + ".SH NAME\n"
+    			   + "argparse4j\n"
+    			   + ".SH SYNOPSIS\n"
+    			   + ".B argparse4j\n", baos.toString("UTF-8"));
     }
 
     @Test

@@ -75,6 +75,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
     private String prog_;
     private String usage_ = "";
     private String description_ = "";
+    private String longDescription_;
     private String epilog_ = "";
     private String version_ = "";
     private PrefixPattern prefixPattern_;
@@ -225,6 +226,19 @@ public final class ArgumentParserImpl implements ArgumentParser {
     public ArgumentParserImpl description(String description) {
         description_ = TextHelper.nonNull(description);
         return this;
+    }
+    
+    /**
+     * Set text to display in the description section of the man page.
+     * 
+     * @param longDescription
+     *            text to display in the description section of the man page
+     * @return this
+     */
+    @Override
+    public ArgumentParserImpl longDescription(String longDescription) {
+    	longDescription_ = TextHelper.nonNull(longDescription);
+    	return this;
     }
 
     @Override
@@ -395,7 +409,27 @@ public final class ArgumentParserImpl implements ArgumentParser {
             firstIndent = "";
             subsequentIndent = indent.substring(0, offset);
         }
-        List<String> opts = new ArrayList<String>();
+        List<String> opts = getUsageOpts(
+        		new Function<ArgumentImpl, String>() {
+					@Override
+					public String apply(ArgumentImpl t) {
+						return t.formatShortSyntax();
+					}
+        			
+        		},
+        		new Function<ArgumentImpl, String>() {
+					@Override
+					public String apply(ArgumentImpl t) {
+						return t.formatShortSyntaxNoBracket();
+					}
+        			
+        		});
+        printArgumentUsage(writer, opts, offset, firstIndent, subsequentIndent,
+                format_width);
+    }
+
+	public List<String> getUsageOpts(Function<ArgumentImpl, String> formatArg, Function<ArgumentImpl, String> formatArgNoBracket) {
+		List<String> opts = new ArrayList<String>();
         addUpperParserUsage(opts, mainParser_);
         if (command_ != null) {
             opts.add(command_);
@@ -404,7 +438,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             if (arg.getHelpControl() != Arguments.SUPPRESS
                     && (arg.getArgumentGroup() == null || !arg
                             .getArgumentGroup().isMutex())) {
-                opts.add(arg.formatShortSyntax());
+                opts.add(formatArg.apply(arg));
             }
         }
         for (ArgumentGroupImpl group : arggroups_) {
@@ -413,36 +447,36 @@ public final class ArgumentParserImpl implements ArgumentParser {
             if (group.isMutex()) {
                 if (numArgs > 1) {
                     opts.add((group.isRequired() ? "(" : "[")
-                            + args.get(0).formatShortSyntaxNoBracket());
+                            + formatArgNoBracket.apply(args.get(0)));
                     for (int i = 1; i < numArgs - 1; ++i) {
                         ArgumentImpl arg = args.get(i);
                         opts.add("|");
-                        opts.add(arg.formatShortSyntaxNoBracket());
+                        opts.add(formatArgNoBracket.apply(arg));
                     }
                     opts.add("|");
-                    opts.add(args.get(numArgs - 1).formatShortSyntaxNoBracket()
+                    opts.add(formatArgNoBracket.apply(args.get(numArgs - 1))
                             + (group.isRequired() ? ")" : "]"));
                 } else if (numArgs == 1) {
                     if (group.isRequired()) {
-                        opts.add(args.get(0).formatShortSyntaxNoBracket());
+                        opts.add(formatArgNoBracket.apply(args.get(0)));
                     } else {
-                        opts.add(args.get(0).formatShortSyntax());
+                        opts.add(formatArg.apply(args.get(0)));
                     }
                 }
             }
         }
         for (ArgumentImpl arg : posargs_) {
             if (arg.getHelpControl() != Arguments.SUPPRESS) {
-                opts.add(arg.formatShortSyntax());
+                opts.add(formatArg.apply(arg));
             }
         }
         if (subparsers_.hasSubCommand()) {
+        	// TODO: Pass formatArg and formatArgNoBracket along
             opts.add(subparsers_.formatShortSyntax());
             opts.add("...");
         }
-        printArgumentUsage(writer, opts, offset, firstIndent, subsequentIndent,
-                format_width);
-    }
+		return opts;
+	}
 
     /**
      * Returns arguments in {@code args} whose {@link Argument#getHelpControl()}
@@ -1320,6 +1354,59 @@ public final class ArgumentParserImpl implements ArgumentParser {
     @Override
     public String formatVersion() {
         return substitutePlaceholder(version_);
+    }
+    
+    @Override
+    public void printMan(PrintWriter writer) {
+    	writer.print(".TH " + prog_ + " 1\n");
+    	
+    	writer.print(".SH NAME\n");
+    	writer.print(prog_);
+    	if (description_ != null) {
+    		// TODO: Escape
+    		writer.print(" \\- " + description_);
+    	}
+    	writer.print("\n");
+    	
+    	writer.print(".SH SYNOPSIS\n");
+    	writer.print(".B " + prog_ + "\n");
+    	
+        List<String> opts = getUsageOpts(
+        		new Function<ArgumentImpl, String>() {
+					@Override
+					public String apply(ArgumentImpl t) {
+						return t.formatShortManSyntax();
+					}
+        			
+        		},
+        		new Function<ArgumentImpl, String>() {
+					@Override
+					public String apply(ArgumentImpl t) {
+						return t.formatShortManSyntaxNoBracket();
+					}
+        			
+        		});
+        
+        for (String opt : opts) {
+        	writer.print(opt + "\n");
+        }
+        
+        if (longDescription_ != null) {
+        	// TODO: Escape. Replace instances of the name with \fB
+        	writer.print(".SH DESCRIPTION\n");
+        	if (longDescription_.startsWith(prog_ + " ")) {
+        		writer.print(".B " + prog_ + "\n");
+        		writer.print(longDescription_.substring(prog_.length() + 1));
+        	} else {
+        		writer.print(longDescription_);
+        	}
+        	writer.write("\n");
+        }
+        
+        writer.print(".SH OPTIONS\n");
+        for (ArgumentImpl arg : optargs_) {
+        	arg.printMan(writer);
+        }
     }
 
     @Override

@@ -35,6 +35,9 @@ public interface Subparser extends ArgumentParser {
 
     @Override
     Subparser description(String description);
+    
+    @Override
+    Subparser longDescription(String longDescription);
 
     @Override
     Subparser epilog(String epilog);

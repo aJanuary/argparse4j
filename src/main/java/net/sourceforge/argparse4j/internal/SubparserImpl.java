@@ -93,6 +93,12 @@ public final class SubparserImpl implements Subparser {
         parser_.description(description);
         return this;
     }
+    
+	@Override
+	public SubparserImpl longDescription(String longDescription) {
+		parser_.longDescription(longDescription);
+		return this;
+	}
 
     @Override
     public SubparserImpl epilog(String epilog) {
@@ -151,6 +157,12 @@ public final class SubparserImpl implements Subparser {
     public void printVersion(PrintWriter writer) {
         parser_.printVersion(writer);
     }
+    
+	@Override
+	public void printMan(PrintWriter writer) {
+		parser_.printMan(writer);;
+	}
+
 
     @Override
     public String formatVersion() {
@@ -271,4 +283,5 @@ public final class SubparserImpl implements Subparser {
     public String getCommand() {
         return parser_.getCommand();
     }
+
 }
