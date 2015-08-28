@@ -1472,6 +1472,54 @@ public class ArgumentParserImplTest {
     			   + ".BR \\-\\-e\n"
     			   , baos.toString("UTF-8"));
     }
+
+    
+    @Test
+    public void testPrintManWithArgumentGroups() throws ArgumentParserException, UnsupportedEncodingException {
+        ArgumentParserImpl ap = new ArgumentParserImpl("argparse4j", false);
+        ArgumentGroup group1 = ap.addArgumentGroup("group1").description(
+                "group1 description");
+        group1.addArgument("foo").help("foo help");
+        ArgumentGroup group2 = ap.addArgumentGroup("group2").description(
+                "group2 description");
+        group2.addArgument("--bar").help("bar help");
+        assertEquals(String.format(
+                  TextHelper.LOCALE_ROOT,
+                  "usage: argparse4j [--bar BAR] foo%n"
+                + "%n"
+                + "group1:%n"
+                + "  group1 description%n"
+                + "%n"
+                + "  foo                    foo help%n"
+                + "%n"
+                + "group2:%n"
+                + "  group2 description%n"
+                + "%n"
+                + "  --bar BAR              bar help%n"),
+                ap.formatHelp());
+  
+    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    	PrintWriter pw = new PrintWriter(baos);
+    	ap.printMan(pw);
+    	pw.flush();
+    	
+    	System.out.println(baos.toString("UTF-8"));
+    	
+    	assertEquals(".TH argparse4j 1\n"
+    			   + ".SH NAME\n"
+    			   + "argparse4j\n"
+    			   + ".SH SYNOPSIS\n"
+    			   + ".B argparse4j\n"
+    			   + "[\\fB--bar\\fR \\fIBAR\\fR]\n"
+    			   + "\\fIfoo\\fR\n"
+    			   + ".SH OPTIONS\n"
+    			   + ".SS GROUP2\n"
+    			   + "group2 description\n"
+    			   + ".TP\n"
+    			   + ".BR \\-\\-bar \" \" \\fIBAR\\fR\n"
+    			   + "bar help\n"
+    			   , baos.toString("UTF-8"));
+    }
     
     @Test
     public void testCandidateEquality() {

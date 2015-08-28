@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.sourceforge.argparse4j.helper.TextHelper;
+import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentGroup;
 import net.sourceforge.argparse4j.inf.MutuallyExclusiveGroup;
 
@@ -133,4 +134,26 @@ public final class ArgumentGroupImpl implements ArgumentGroup,
     public boolean isSeparateHelp() {
         return !mutex_ || !title_.isEmpty() || !description_.isEmpty();
     }
+
+	public void printManOptions(PrintWriter writer) {
+        List<ArgumentImpl> filteredArgs = new ArrayList<ArgumentImpl>();
+        
+        for (ArgumentImpl arg : args_) {
+			boolean isHelp = arg.getAction() == Arguments.help();
+			boolean isOptional = arg.isOptionalArgument();
+			if (!isHelp && isOptional) {
+        		// Don't show the help for each subparser
+				filteredArgs.add(arg);
+			}
+        }
+        
+        if (!filteredArgs.isEmpty()) {
+            writer.write(".SS " + (title_ == null ? "" : title_.toUpperCase()) + "\n");
+            writer.write(description_ + "\n");
+            
+	        for (ArgumentImpl arg : filteredArgs) {
+				arg.printMan(writer);
+	        }
+        }
+	}
 }

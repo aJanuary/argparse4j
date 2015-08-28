@@ -1376,7 +1376,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
     	List<String> descriptionLines = new ArrayList<String>();
     	String description = longDescription_ != null ? longDescription_ : description_;
     	
-        if (description != null) {
+        if (!description.isEmpty()) {
         	descriptionLines.add(description);
         }
         
@@ -1438,25 +1438,30 @@ public final class ArgumentParserImpl implements ArgumentParser {
 	}
 	
 	public void printSubparserManOptions(PrintWriter writer, boolean isFirst) {
-		List<ArgumentImpl> filteredArgs;
-		if (isFirst) {
-			filteredArgs = optargs_;
-		} else {
-			filteredArgs = new ArrayList<ArgumentImpl>();
-			for (ArgumentImpl arg : optargs_) {
-	        	if (arg.getAction() != Arguments.help()) {
-	        		// Don't show the help for each subparser
-	        		filteredArgs.add(arg);
-	        	}
-			}
+		List<ArgumentImpl> filteredArgs = new ArrayList<ArgumentImpl>();
+		for (ArgumentImpl arg : optargs_) {
+			boolean isHelp = arg.getAction() == Arguments.help();
+			boolean inArgumentGroup = arg.getArgumentGroup() != null && arg.getArgumentGroup().isSeparateHelp();
+			if ((isFirst || !isHelp) && !inArgumentGroup) {
+        		// Don't show the help for each subparser
+        		filteredArgs.add(arg);
+        	}
 		}
 		
 		if (!isFirst && !filteredArgs.isEmpty()) {
 			writer.write(".SS " + command_.toUpperCase() + "\n");
 		}
+		
         for (ArgumentImpl arg : filteredArgs) {
         	arg.printMan(writer);
         }
+        
+        for (ArgumentGroupImpl group : arggroups_) {
+            if (group.isSeparateHelp()) {
+            	group.printManOptions(writer);
+            }
+        }
+        
         subparsers_.printSubparserManOptions(writer);
 	}
 

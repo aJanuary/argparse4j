@@ -329,7 +329,7 @@ public final class ArgumentImpl implements Argument {
     }
     
 	public void printMan(PrintWriter writer) {
-        if (helpControl_ == Arguments.SUPPRESS) {
+        if (helpControl_ == Arguments.SUPPRESS || !isOptionalArgument()) {
             return;
         }
         
