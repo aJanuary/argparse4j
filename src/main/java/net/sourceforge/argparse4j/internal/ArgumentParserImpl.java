@@ -34,6 +34,7 @@ import java.lang.reflect.Method;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -409,7 +410,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
             firstIndent = "";
             subsequentIndent = indent.substring(0, offset);
         }
-        List<String> opts = getUsageOpts(
+        List<String> opts = getUsageOpts(true, 
         		new Function<ArgumentImpl, String>() {
 					@Override
 					public String apply(ArgumentImpl t) {
@@ -428,12 +429,14 @@ public final class ArgumentParserImpl implements ArgumentParser {
                 format_width);
     }
 
-	public List<String> getUsageOpts(Function<ArgumentImpl, String> formatArg, Function<ArgumentImpl, String> formatArgNoBracket) {
+	public List<String> getUsageOpts(boolean processSubcommands, Function<ArgumentImpl, String> formatArg, Function<ArgumentImpl, String> formatArgNoBracket) {
 		List<String> opts = new ArrayList<String>();
-        addUpperParserUsage(opts, mainParser_);
-        if (command_ != null) {
-            opts.add(command_);
-        }
+		if (processSubcommands) {
+			addUpperParserUsage(opts, mainParser_);
+	        if (command_ != null) {
+	            opts.add(command_);
+	        }
+		}
         for (ArgumentImpl arg : optargs_) {
             if (arg.getHelpControl() != Arguments.SUPPRESS
                     && (arg.getArgumentGroup() == null || !arg
@@ -470,8 +473,7 @@ public final class ArgumentParserImpl implements ArgumentParser {
                 opts.add(formatArg.apply(arg));
             }
         }
-        if (subparsers_.hasSubCommand()) {
-        	// TODO: Pass formatArg and formatArgNoBracket along
+        if (processSubcommands && subparsers_.hasSubCommand()) {
             opts.add(subparsers_.formatShortSyntax());
             opts.add("...");
         }
@@ -1362,16 +1364,45 @@ public final class ArgumentParserImpl implements ArgumentParser {
     	
     	writer.print(".SH NAME\n");
     	writer.print(prog_);
-    	if (description_ != null) {
+    	if (!description_.isEmpty()) {
     		// TODO: Escape
     		writer.print(" \\- " + description_);
     	}
     	writer.print("\n");
     	
-    	writer.print(".SH SYNOPSIS\n");
-    	writer.print(".B " + prog_ + "\n");
+    	writer.print(".SH SYNOPSIS\n");    	
+    	printSubparserMan(writer, prog_, true);
+        
+    	List<String> descriptionLines = new ArrayList<String>();
+    	String description = longDescription_ != null ? longDescription_ : description_;
     	
-        List<String> opts = getUsageOpts(
+        if (description != null) {
+        	descriptionLines.add(description);
+        }
+        
+        if (subparsers_.hasSubCommand()) {
+        	descriptionLines.addAll(subparsers_.getSubparserManDescriptions());
+        }
+        
+        if (!descriptionLines.isEmpty()) {
+        	writer.print(".SH DESCRIPTION\n");
+        	for (String descriptionLine : descriptionLines) {
+        		writer.print(descriptionLine + "\n");
+        	}
+        }
+        
+        writer.print(".SH OPTIONS\n");
+        printSubparserManOptions(writer, true);
+    }
+    
+	public void printSubparserMan(PrintWriter writer, String commandStack, boolean isFirst) {
+		if (!isFirst) {
+			writer.print(".PP\n");
+		}
+		
+    	writer.print(".B " + commandStack + "\n");
+    	
+        List<String> opts = getUsageOpts(false,
         		new Function<ArgumentImpl, String>() {
 					@Override
 					public String apply(ArgumentImpl t) {
@@ -1391,23 +1422,43 @@ public final class ArgumentParserImpl implements ArgumentParser {
         	writer.print(opt + "\n");
         }
         
-        if (longDescription_ != null) {
-        	// TODO: Escape. Replace instances of the name with \fB
-        	writer.print(".SH DESCRIPTION\n");
-        	if (longDescription_.startsWith(prog_ + " ")) {
-        		writer.print(".B " + prog_ + "\n");
-        		writer.print(longDescription_.substring(prog_.length() + 1));
-        	} else {
-        		writer.print(longDescription_);
-        	}
-        	writer.write("\n");
+        if (subparsers_.hasSubCommand()) {
+        	subparsers_.printSubparserMan(writer, commandStack);
         }
-        
-        writer.print(".SH OPTIONS\n");
-        for (ArgumentImpl arg : optargs_) {
+	}
+	
+	public Collection<? extends String> getSubparserManDescriptions() {
+		if (longDescription_ != null) {
+			return Arrays.asList(".SS " + command_.toUpperCase(), longDescription_);
+		}
+		if (!description_.isEmpty()) {
+			return Arrays.asList(".SS " + command_.toUpperCase(), description_);
+		}
+		return Arrays.asList();
+	}
+	
+	public void printSubparserManOptions(PrintWriter writer, boolean isFirst) {
+		List<ArgumentImpl> filteredArgs;
+		if (isFirst) {
+			filteredArgs = optargs_;
+		} else {
+			filteredArgs = new ArrayList<ArgumentImpl>();
+			for (ArgumentImpl arg : optargs_) {
+	        	if (arg.getAction() != Arguments.help()) {
+	        		// Don't show the help for each subparser
+	        		filteredArgs.add(arg);
+	        	}
+			}
+		}
+		
+		if (!isFirst && !filteredArgs.isEmpty()) {
+			writer.write(".SS " + command_.toUpperCase() + "\n");
+		}
+        for (ArgumentImpl arg : filteredArgs) {
         	arg.printMan(writer);
         }
-    }
+        subparsers_.printSubparserManOptions(writer);
+	}
 
     @Override
     public void handleError(ArgumentParserException e) {

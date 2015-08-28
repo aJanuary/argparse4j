@@ -1411,51 +1411,68 @@ public class ArgumentParserImplTest {
     }
     
     @Test
-    public void testPrintMan() throws UnsupportedEncodingException {
+    public void testPrintManWithSubparsers() throws UnsupportedEncodingException {
+    	ap.longDescription("argparse4j is a library for parsing command line arguments");
+    	ap.addArgument("-a");
+    	ap.addArgument("-b").required(true);
+        MutuallyExclusiveGroup group = ap.addMutuallyExclusiveGroup("mutex").required(true);
+        group.addArgument("-c").required(true);
+        group.addArgument("-d").required(true);
+        ap.addArgument("file");
+        Subparser foosub = ap.addSubparsers().addParser("foo").longDescription("foo is a subparser");
+        foosub.addArgument("hash");
+        Subparser bazsub = foosub.addSubparsers().addParser("baz");
+        bazsub.addArgument("--e").action(storeTrue());
+        
     	ByteArrayOutputStream baos = new ByteArrayOutputStream();
     	PrintWriter pw = new PrintWriter(baos);
-    	
-    	ap.description("This is argparser4j.");
-    	ap.longDescription("argparse4j is a library for parsing arguments.");
-    	ap.addArgument("-f", "--foo").help("switches on foo");
     	ap.printMan(pw);
     	pw.flush();
     	
-    	assertEquals(".TH argparse4j 1\n"
-    			   + ".SH NAME\n"
-    			   + "argparse4j \\- This is argparser4j.\n"
-    			   + ".SH SYNOPSIS\n"
-    			   + ".B argparse4j\n"
-    			   + "[\\fB-h\\fR]\n"
-    			   + "[\\fB-f\\fR \\fIFOO\\fR]\n"
-    			   + ".SH DESCRIPTION\n"
-    			   + ".B argparse4j\n"
-    			   + "is a library for parsing arguments.\n"
-    			   + ".SH OPTIONS\n"
-    			   + ".TP\n"
-    			   + ".BR \\-h \", \" \\-\\-help\n"
-    			   + "show this help message and exit\n"
-    			   + ".TP\n"
-    			   + ".BR \\-f \" \" \\fIFOO\\fR \", \" \\-\\-foo \" \" \\fIFOO\\fR\n"
-    			   + "switches on foo\n"
-    			   , baos.toString("UTF-8"));
-    }
-    
-    @Test
-    public void testPrintManWithNoDescription() throws UnsupportedEncodingException {
-    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    	PrintWriter pw = new PrintWriter(baos);
-    	
-    	ap.printMan(pw);
-    	pw.flush();
+    	System.out.println(baos.toString("UTF-8"));
     	
     	assertEquals(".TH argparse4j 1\n"
     			   + ".SH NAME\n"
     			   + "argparse4j\n"
     			   + ".SH SYNOPSIS\n"
-    			   + ".B argparse4j\n", baos.toString("UTF-8"));
+    			   + ".B argparse4j\n"
+    			   + "[\\fB-h\\fR]\n"
+    			   + "[\\fB-a\\fR \\fIA\\fR]\n"
+    			   + "\\fB-b\\fR \\fIB\\fR\n"
+    			   + "(\\fB-c\\fR \\fIC\\fR\n"
+    			   + "|\n"
+    			   + "\\fB-d\\fR \\fID\\fR)\n"
+    			   + "\\fIfile\\fR\n"
+    			   + ".PP\n"
+    			   + ".B argparse4j foo\n"
+    			   + "[\\fB-h\\fR]\n"
+    			   + "\\fIhash\\fR\n"
+    			   + ".PP\n"
+    			   + ".B argparse4j foo baz\n"
+    			   + "[\\fB-h\\fR]\n"
+    			   + "[\\fB--e\\fR]\n"
+    			   + ".SH DESCRIPTION\n"
+    			   + "argparse4j is a library for parsing command line arguments\n"
+    			   + ".SS FOO\n"
+    			   + "foo is a subparser\n"
+    			   + ".SH OPTIONS\n"
+    			   + ".TP\n"
+    			   + ".BR \\-h \", \" \\-\\-help\n"
+    			   + "show this help message and exit\n"
+    			   + ".TP\n"
+    			   + ".BR \\-a \" \" \\fIA\\fR\n"
+    			   + ".TP\n"
+    			   + ".BR \\-b \" \" \\fIB\\fR\n"
+    			   + ".TP\n"
+    			   + ".BR \\-c \" \" \\fIC\\fR\n"
+    			   + ".TP\n"
+    			   + ".BR \\-d \" \" \\fID\\fR\n"
+    			   + ".SS BAZ\n"
+    			   + ".TP\n"
+    			   + ".BR \\-\\-e\n"
+    			   , baos.toString("UTF-8"));
     }
-
+    
     @Test
     public void testCandidateEquality() {
         Candidate foo = new Candidate(15, "foo");

@@ -174,16 +174,16 @@ public final class ArgumentImpl implements Argument {
                 sb.append("[");
             }
             sb.append("\\fB").append(flags_[0]).append("\\fR");
-            String mv = formatMetavar();
+            String mv = formatManMetavar();
             if (!mv.isEmpty()) {
-                sb.append(" \\fI").append(mv).append("\\fR");
+                sb.append(" ").append(mv);
             }
             if (!required_) {
                 sb.append("]");
             }
             return sb.toString();
         } else {
-            return formatMetavar();
+            return formatManMetavar();
         }
     }
     
@@ -191,13 +191,13 @@ public final class ArgumentImpl implements Argument {
         if (name_ == null) {
             StringBuilder sb = new StringBuilder();
             sb.append("\\fB").append(flags_[0]).append("\\fR");
-            String mv = formatMetavar();
+            String mv = formatManMetavar();
             if (!mv.isEmpty()) {
-                sb.append(" \\fI").append(mv).append("\\fR");
+                sb.append(" ").append(mv);
             }
             return sb.toString();
         } else {
-            return formatMetavar();
+            return formatManMetavar();
         }
     }
 
@@ -238,6 +238,36 @@ public final class ArgumentImpl implements Argument {
                 }
                 for (; i < minNumArg_; ++i) {
                     sb.append(metavar[metavar.length - 1]).append(" ");
+                }
+                sb.delete(sb.length() - 1, sb.length());
+            }
+        }
+        return sb.toString();
+    }
+    
+    public String formatManMetavar() {
+        StringBuilder sb = new StringBuilder();
+        if (action_.consumeArgument()) {
+            String[] metavar = resolveMetavar();
+            if (minNumArg_ == 0 && maxNumArg_ == 1) {
+                sb.append("[\\fI").append(metavar[0]).append("\\fR]");
+            } else if (minNumArg_ == 0 && maxNumArg_ == Integer.MAX_VALUE) {
+                sb.append("[\\fI").append(metavar[0]).append("\\fR [\\fI")
+                        .append(metavar.length == 1 ? metavar[0] : metavar[1])
+                        .append("\\fR ...]]");
+            } else if (minNumArg_ == 1 && maxNumArg_ == Integer.MAX_VALUE) {
+                sb.append("\\fI").append(metavar[0]).append("\\fR [\\fI")
+                        .append(metavar.length == 1 ? metavar[0] : metavar[1])
+                        .append("\\fR ...]");
+            } else if (minNumArg_ == -1) {
+                sb.append("\\fI").append(metavar[0]).append("\\fR");
+            } else if (minNumArg_ > 0 && minNumArg_ == maxNumArg_) {
+                int i, max;
+                for (i = 0, max = Math.min(minNumArg_, metavar.length); i < max; ++i) {
+                    sb.append("\\fI").append(metavar[i]).append("\\fR ");
+                }
+                for (; i < minNumArg_; ++i) {
+                    sb.append("\\fI").append(metavar[metavar.length - 1]).append("\\fR ");
                 }
                 sb.delete(sb.length() - 1, sb.length());
             }

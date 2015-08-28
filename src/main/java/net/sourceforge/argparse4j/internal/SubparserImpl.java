@@ -25,6 +25,7 @@ package net.sourceforge.argparse4j.internal;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -279,9 +280,20 @@ public final class SubparserImpl implements Subparser {
                     parser_.getTextWidthCounter(), format_width);
         }
     }
+    
+	public void printSubparserMan(PrintWriter writer, String commandStack) {
+		parser_.printSubparserMan(writer, commandStack + " " + command_, false);
+	}
+	
+	public void printSubparserManOptions(PrintWriter writer) {
+		parser_.printSubparserManOptions(writer, false);
+	}
 
     public String getCommand() {
         return parser_.getCommand();
     }
 
+	public Collection<? extends String> getSubparserManDescription() {
+		return parser_.getSubparserManDescriptions();
+	}
 }

@@ -24,6 +24,7 @@
 package net.sourceforge.argparse4j.internal;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -207,7 +208,7 @@ public final class SubparsersImpl implements Subparsers {
             return metavar_;
         }
     }
-
+    
     /**
      * Writes the help message for this and descendants.
      * 
@@ -226,6 +227,23 @@ public final class SubparsersImpl implements Subparsers {
             }
         }
     }
+    
+	public void printSubparserMan(PrintWriter writer, String commandStack) {
+        for (Map.Entry<String, SubparserImpl> entry : parsers_.entrySet()) {
+            // Don't generate help for aliases.
+            if (entry.getKey().equals(entry.getValue().getCommand())) {
+                entry.getValue().printSubparserMan(writer, commandStack);
+            }
+        }
+	}
+	
+	public void printSubparserManOptions(PrintWriter writer) {
+        for (Map.Entry<String, SubparserImpl> entry : parsers_.entrySet()) {
+            // Don't generate help for aliases.
+            if (entry.getKey().equals(entry.getValue().getCommand())) {
+                entry.getValue().printSubparserManOptions(writer);
+            }
+        }	}
 
     /**
      * Returns collection of the sub-command name under this object.
@@ -257,4 +275,14 @@ public final class SubparsersImpl implements Subparsers {
             }
         }
     }
+
+	public Collection<? extends String> getSubparserManDescriptions() {
+		List<String> descriptionLines = new ArrayList<String>();
+        for (Map.Entry<String, SubparserImpl> entry : parsers_.entrySet()) {
+            if (entry.getKey().equals(entry.getValue().getCommand())) {
+            	descriptionLines.addAll(entry.getValue().getSubparserManDescription());
+            }
+        }
+		return descriptionLines;
+	}
 }
